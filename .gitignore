@@ -2,3 +2,14 @@
 *~
 # and the generated manual page
 rox.1
+
+# Build outputs
+ROX-Filer/build/
+ROX-Filer/ROX-Filer
+ROX-Filer/ROX-Filer.dbg
+ROX-Filer/src/config.h
+ROX-Filer/src/config.log
+ROX-Filer/src/config.status
+ROX-Filer/src/configure
+ROX-Filer/src/autom4te.cache/
+*.o
