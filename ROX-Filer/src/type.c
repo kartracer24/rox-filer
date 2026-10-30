@@ -63,22 +63,96 @@
 #define TYPE_NS "http://www.freedesktop.org/standards/shared-mime-info"
 enum {SET_MEDIA, SET_TYPE};
 
-/* Colours for file types (same order as base types) */
+/* Colours for file types (same order as base types).
+ * The defaults are relative to the theme's normal text colour, so they
+ * remain readable on both light and dark themes: file/unknown/device text
+ * follows the theme text colour exactly, while the other types are tints
+ * of it (or, for errors, red). Users can still override each one in
+ * Options -> Display -> Colours. */
 static gchar *opt_type_colours[][2] = {
-	{"display_err_colour",  "#ff0000"},
-	{"display_unkn_colour", "#000000"},
-	{"display_dir_colour",  "#000080"},
-	{"display_pipe_colour", "#444444"},
-	{"display_sock_colour", "#ff00ff"},
-	{"display_file_colour", "#000000"},
-	{"display_cdev_colour", "#000000"},
-	{"display_bdev_colour", "#000000"},
-	{"display_door_colour", "#ff00ff"},
-	{"display_exec_colour", "#006000"},
-	{"display_adir_colour", "#006000"}
+	{"display_err_colour",  "theme_red"},
+	{"display_unkn_colour", "theme_text"},
+	{"display_dir_colour",  "theme_text"},
+	{"display_pipe_colour", "theme_dim"},
+	{"display_sock_colour", "theme_magenta"},
+	{"display_file_colour", "theme_text"},
+	{"display_cdev_colour", "theme_text"},
+	{"display_bdev_colour", "theme_text"},
+	{"display_door_colour", "theme_magenta"},
+	{"display_exec_colour", "theme_green"},
+	{"display_adir_colour", "theme_green"}
 };
 #define NUM_TYPE_COLOURS\
 		(sizeof(opt_type_colours) / sizeof(opt_type_colours[0]))
+
+/* Resolve a theme-relative colour name to a hex string, derived from the
+ * current theme's normal text colour. If the theme text is light (dark
+ * background) we use light tints; if dark (light background) we use dark
+ * tints. The result is written to 'buffer' (which must be at least 8
+ * bytes, e.g. "#82AAFF" + NUL) and is valid until the next call.
+ */
+static void theme_type_colour(const char *name, char *buffer, gsize len)
+{
+	GdkColor text = {0, 0, 0, 0};
+	GtkStyle *style;
+	gulong lum;
+	int r, g, b;
+	gboolean light_theme;
+
+	/* Sample the theme's normal text colour via a temp widget style.
+	 * The widget must be realized so its style reflects the loaded
+	 * gtkrc (GTK2_RC_FILES), not the compiled-in defaults.
+	 */
+	{
+		GtkWidget *w = gtk_invisible_new();
+
+		gtk_widget_realize(w);
+		style = gtk_rc_get_style(w);
+		if (!style)
+			style = gtk_widget_get_default_style();
+		if (style && style->text)
+			text = style->text[GTK_STATE_NORMAL];
+		gtk_widget_destroy(w);
+	}
+
+	lum = (text.red * 299 + text.green * 587 + text.blue * 114) / 1000;
+	light_theme = lum < 32768;	/* dark text => light background */
+
+	if (strcmp(name, "theme_text") == 0)
+	{
+		r = text.red >> 8;
+		g = text.green >> 8;
+		b = text.blue >> 8;
+	}
+	else if (strcmp(name, "theme_blue") == 0)
+	{
+		/* Tints that stay visible on their background */
+		if (light_theme) { r = 0x00; g = 0x00; b = 0x80; }
+		else		 { r = 0x82; g = 0xAA; b = 0xFF; }
+	}
+	else if (strcmp(name, "theme_green") == 0)
+	{
+		if (light_theme) { r = 0x00; g = 0x60; b = 0x00; }
+		else		 { r = 0x91; g = 0xB8; b = 0x59; }
+	}
+	else if (strcmp(name, "theme_red") == 0)
+	{
+		if (light_theme) { r = 0xFF; g = 0x00; b = 0x00; }
+		else		 { r = 0xFF; g = 0x53; b = 0x70; }
+	}
+	else if (strcmp(name, "theme_magenta") == 0)
+	{
+		if (light_theme) { r = 0xFF; g = 0x00; b = 0xFF; }
+		else		 { r = 0xC7; g = 0x92; b = 0xEA; }
+	}
+	else /* theme_dim: halfway between text and background */
+	{
+		if (light_theme) { r = 0x44; g = 0x44; b = 0x44; }
+		else		 { r = 0x69; g = 0x70; b = 0x98; }
+	}
+
+	snprintf(buffer, len, "#%02X%02X%02X", r, g, b);
+}
 
 /* Parsed colours for file types */
 static Option o_type_colours[NUM_TYPE_COLOURS];
@@ -126,7 +200,7 @@ void type_init(void)
 	int	    i;
 
 	icon_theme = gtk_icon_theme_new();
-	
+
 	type_hash = g_hash_table_new(g_str_hash, g_str_equal);
 
 	text_plain = get_mime_type("text/plain", TRUE);
@@ -147,7 +221,7 @@ void type_init(void)
 	option_add_string(&o_icon_theme, "icon_theme", "ROX");
 	option_add_int(&o_display_colour_types, "display_colour_types", TRUE);
 	option_register_widget("icon-theme-chooser", build_icon_theme);
-	
+
 	for (i = 0; i < NUM_TYPE_COLOURS; i++)
 		option_add_string(&o_type_colours[i],
 				  opt_type_colours[i][0],
@@ -234,7 +308,7 @@ const char *basetype_name(DirItem *item)
 		case TYPE_DOOR:
 			return _("Door");
 	}
-	
+
 	return _("Unknown");
 }
 
@@ -261,7 +335,7 @@ GList *mime_type_name_list(gboolean only_regular)
 
 	list.list=NULL;
 	list.only_regular=only_regular;
-		
+
 	g_hash_table_foreach(type_hash, append_names, &list);
 	list.list = g_list_sort(list.list, (GCompareFunc) strcmp);
 
@@ -530,7 +604,7 @@ out:
 	}
 
 	type->image_time = now;
-	
+
 	g_object_ref(type->image);
 	return type->image;
 }
@@ -539,13 +613,13 @@ GdkAtom type_to_atom(MIME_type *type)
 {
 	char	*str;
 	GdkAtom	retval;
-	
+
 	g_return_val_if_fail(type != NULL, GDK_NONE);
 
 	str = g_strconcat(type->media_type, "/", type->subtype, NULL);
 	retval = gdk_atom_intern(str, FALSE);
 	g_free(str);
-	
+
 	return retval;
 }
 
@@ -572,7 +646,7 @@ static gboolean set_shell_action(GtkWidget *dialog)
 	g_return_val_if_fail(entry != NULL, FALSE);
 
 	command = gtk_entry_get_text(entry);
-	
+
 	if (!strchr(command, '$'))
 	{
 		show_shell_help(NULL);
@@ -582,10 +656,10 @@ static gboolean set_shell_action(GtkWidget *dialog)
 	path = get_action_save_path(dialog);
 	if (!path)
 		return FALSE;
-		
+
 	tmp = g_strdup_printf("#! /bin/sh\nexec %s\n", command);
 	len = strlen(tmp);
-	
+
 	fd = open(path, O_CREAT | O_WRONLY, 0755);
 	if (fd == -1)
 		error = errno;
@@ -635,10 +709,10 @@ static guchar *handler_for_radios(GObject *dialog)
 
 	radios = g_object_get_data(G_OBJECT(dialog), "rox-radios");
 	type = g_object_get_data(G_OBJECT(dialog), "mime_type");
-	
+
 	g_return_val_if_fail(radios != NULL, NULL);
 	g_return_val_if_fail(type != NULL, NULL);
-	
+
 	switch (radios_get_value(radios))
 	{
 		case SET_MEDIA:
@@ -758,7 +832,7 @@ static guchar *get_current_command(MIME_type *type)
 
 	if ((!S_ISREG(info.st_mode)) || info.st_size > 256)
 		goto out;		/* Only use small regular files */
-	
+
 	if (!load_file(handler, &data, &len))
 		goto out;		/* Didn't load OK */
 
@@ -865,7 +939,7 @@ void type_set_handler_dialog(MIME_type *type)
 			  "use this as the default."), SET_MEDIA,
 			_("Set default for all `%s/<anything>'"),
 			type->media_type);
-	
+
 	radios_add(radios,
 			_("Use this application for all files with this MIME "
 			  "type."), SET_TYPE,
@@ -878,7 +952,7 @@ void type_set_handler_dialog(MIME_type *type)
 	frame = drop_box_new(_("Drop a suitable application here"));
 
 	g_object_set_data(G_OBJECT(dialog), "rox-dropbox", frame);
-	
+
 	radios_pack(radios, GTK_BOX(dialog->vbox));
 	gtk_box_pack_start(GTK_BOX(dialog->vbox), frame, TRUE, TRUE, 0);
 
@@ -934,7 +1008,7 @@ void type_set_handler_dialog(MIME_type *type)
 	gtk_box_pack_start(GTK_BOX(dialog->vbox), hbox, FALSE, TRUE, 0);
 
 	gtk_dialog_set_default_response(dialog, GTK_RESPONSE_OK);
-	
+
 	g_signal_connect(dialog, "response",
 			G_CALLBACK(set_action_response), NULL);
 
@@ -964,7 +1038,7 @@ static gboolean remove_handler_with_confirm(const guchar *path)
 				return FALSE;
 			}
 		}
-		
+
 		if (unlink(path))
 		{
 			report_error(_("Can't remove %s: %s"),
@@ -1077,9 +1151,33 @@ gboolean can_set_run_action(DirItem *item)
 static void alloc_type_colours(void)
 {
 	gboolean	success[NUM_TYPE_COLOURS];
+	char		resolved[NUM_TYPE_COLOURS][8];
 	int		change_count = 0;	/* No. needing realloc */
 	int		i;
 	static gboolean	allocated = FALSE;
+
+	/* Resolve theme-relative colour names against the current theme.
+	 * This keeps the type colours readable on both light and dark
+	 * themes without hardcoding any hex values. The option values
+	 * themselves are left untouched (so we don't persist resolved
+	 * colours into the user's saved Options file).
+	 */
+	for (i = 0; i < NUM_TYPE_COLOURS; i++)
+	{
+		const char *value = o_type_colours[i].value;
+
+		if (strcmp(value, "theme_text") == 0 ||
+		    strcmp(value, "theme_blue") == 0 ||
+		    strcmp(value, "theme_green") == 0 ||
+		    strcmp(value, "theme_red") == 0 ||
+		    strcmp(value, "theme_magenta") == 0 ||
+		    strcmp(value, "theme_dim") == 0)
+			theme_type_colour(value, resolved[i],
+					sizeof(resolved[i]));
+		else
+			g_strlcpy(resolved[i], value,
+					sizeof(resolved[i]));
+	}
 
 	/* Parse colours */
 	for (i = 0; i < NUM_TYPE_COLOURS; i++)
@@ -1089,12 +1187,12 @@ static void alloc_type_colours(void)
 		gushort g = c->green;
 		gushort b = c->blue;
 
-		gdk_color_parse(o_type_colours[i].value, &type_colours[i]);
+		gdk_color_parse(resolved[i], &type_colours[i]);
 
 		if (allocated && (c->red != r || c->green != g || c->blue != b))
 			change_count++;
 	}
-	
+
 	/* Free colours if they were previously allocated and
 	 * have changed or become unneeded.
 	 */
@@ -1186,7 +1284,7 @@ static void get_comment(MIME_type *type, const guchar *path)
 {
 	xmlNode *node;
 	XMLwrapper *doc;
-	
+
 	doc = xml_cache_load(path);
 	if (!doc)
 		return;
@@ -1223,7 +1321,7 @@ static void find_comment(MIME_type *type)
 	for (i = 0; i < n_dirs; i++)
 	{
 		guchar *path;
-		
+
 		path = g_strdup_printf("%s/mime/%s/%s.xml", dirs[i],
 				type->media_type, type->subtype);
 		get_comment(type, path);
@@ -1353,7 +1451,7 @@ static void update_theme(Option *option)
 			break;
 	}
 	g_list_free(kids);
-	
+
 	if (next)
 		gtk_option_menu_set_history(om, i);
 	else
@@ -1377,7 +1475,7 @@ static void add_themes_from_dir(GPtrArray *names, const char *dir)
 
 		index_path = g_build_filename(dir, list->pdata[i],
 						"index.theme", NULL);
-		
+
 		if (access(index_path, F_OK) == 0)
 			g_ptr_array_add(names, list->pdata[i]);
 		else
