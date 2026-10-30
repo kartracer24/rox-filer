@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ROX-Filer
+GenericName=File Manager
+Comment=A RISC OS-like filer for X
+Exec=rox
+Icon=rox
+Terminal=false
+Categories=System;FileManager;FileTools;GTK;
+StartupNotify=true
