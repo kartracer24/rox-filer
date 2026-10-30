@@ -59,6 +59,20 @@ To apply it to all GTK 2 apps, add this to `~/.gtkrc-2.0`:
 (then copy or symlink `themes/Material-BL-LB-Dark-gtk2` to
 `~/.themes/Material-BL-LB-Dark`).
 
+Theme credits
+-------------
+The bundled theme is a modified version of the **Material GTK Theme** by
+[Fausto Korpsvart](https://github.com/Fausto-Korpsvart/Material-GTK-Themes)
+(GPL-3.0), which recolors [nana-4's Materia theme](https://github.com/nana-4/materia-theme).
+The GTK 2 port bundled here is itself based on Bridge by ScionicSpectre and
+Adwaita by GNOME.
+
+Modifications in this repository: removed the `murrine`/`adwaita` engine
+dependencies (pixmap rendering only) and adjusted the background color to
+`#181A23` to match the GTK 3/4 variant. The theme is redistributed under the
+terms of the GNU GPL version 3; see the upstream repository for the full
+license text.
+
 
 Conditions
 ----------
