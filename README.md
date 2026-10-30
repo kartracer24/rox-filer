@@ -26,6 +26,40 @@ ROX-Filer
 Documentation for ROX-Filer can be found in the directory ROX-Filer/Help.
 
 
+Building
+--------
+Prerequisites: gcc, make, pkg-config, autoconf, and the dev packages for
+gtk+-2.0, libxml-2.0, sm and ice. Then run:
+
+	$ ./build.sh
+
+This configures out-of-tree (in `ROX-Filer/build/`), compiles, and leaves the
+binary at `ROX-Filer/ROX-Filer`. Run it with `./ROX-Filer/AppRun`.
+
+Note for GCC 14+: the legacy menu code triggers `-Wincompatible-pointer-types`
+errors; `build.sh` passes `-Wno-error=incompatible-pointer-types` to configure
+to restore the old warning-only behaviour.
+
+
+GTK2 theming
+------------
+ROX-Filer is a GTK 2 app, so it does not follow your GTK 3 theme automatically.
+The `themes/` directory ships a GTK 2 port of the Materia dark theme
+(`Material-BL-LB-Dark`) with the unavailable `murrine`/`adwaita` engine
+dependencies removed — it renders using pixmap assets and colors only.
+
+To run ROX-Filer with it:
+
+	$ GTK2_RC_FILES=$PWD/themes/Material-BL-LB-Dark-gtk2/gtkrc ./ROX-Filer/AppRun
+
+To apply it to all GTK 2 apps, add this to `~/.gtkrc-2.0`:
+
+	gtk-theme-name="Material-BL-LB-Dark"
+
+(then copy or symlink `themes/Material-BL-LB-Dark-gtk2` to
+`~/.themes/Material-BL-LB-Dark`).
+
+
 Conditions
 ----------
 This program is free software; you can redistribute it and/or modify
